@@ -8,8 +8,8 @@ import glob
 import argparse
 import socket
 import threading
-import Queue
-import subprocess32 as subprocess
+import queue
+import subprocess
 import multiprocessing.dummy as mp
 
 #[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
@@ -36,11 +36,11 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
         R['out'] = R['out'].decode('unicode_escape').encode('ascii','ignore')
     except subprocess.CalledProcessError as E:
         R['err']['output']  = E.output
-        R['err']['message'] = E.message
+        R['err']['message'] = str(E)
         R['err']['code']    = E.returncode
     except OSError as E:
         R['err']['output']  = E.strerror
-        R['err']['message'] = E.message
+        R['err']['message'] = str(E)
         R['err']['code']    = E.errno
     #parse and convert the resource query
     for line in R['out'].split('\n'):
@@ -52,7 +52,7 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
                 idle_cpu       = round(100.0-cleaned,rounding)
                 N[node]['cpu'] = idle_cpu
         except Exception as E:
-            N[node]['err']['cpu'] = E.message
+            N[node]['err']['cpu'] = str(E)
             pass
         try:
             if line.startswith('KiB Mem'):
@@ -60,7 +60,7 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
                 free_mem       = float(line.split(',')[1].strip(' ').split(' ')[1])
                 N[node]['mem'] = round(100.0*(1.0-free_mem/total_mem),rounding)
         except Exception as E:
-            N[node]['err']['mem'] = E.message
+            N[node]['err']['mem'] = str(E)
             pass
         try:
             if line.startswith('KiB Swap'):
@@ -68,7 +68,7 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
                 free_swap       = float(line.split(',')[1].strip(' ').split(' ')[1])
                 N[node]['swap'] = round(100.0-100.0*(free_swap/total_swap),rounding)
         except Exception as E:
-            N[node]['err']['swap'] = E.message
+            N[node]['err']['swap'] = str(E)
             pass
         try:
             if line.startswith('/dev/'):
@@ -77,7 +77,7 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
                     if disk.endswith(p):
                         N[node]['disks'][p] = round(float(disk.split(' ')[-2].replace('%','')),rounding)
         except Exception as E:
-            N[node]['err']['disks'] = E.message
+            N[node]['err']['disks'] = str(E)
             pass
         try:
             if line.startswith('Core'):
@@ -89,7 +89,7 @@ def get_resources(node,disk_patterns=['/','/data'],verbose=False,rounding=2):
                 else:
                     N[node]['core_temp'][core_numb] = core_temp
         except Exception as E:
-            N[node]['err'][''] = E.message
+            N[node]['err'][''] = str(E)
             pass
     if N[node]['err'] != {}: N[node]['err']['out'] = R['out']
     else:                    N[node].pop('err')
@@ -157,7 +157,7 @@ def command_runner(cx,node,delim='?',wild='*',env=None,verbose=False):
             R[node]['err']['code']    = E.returncode
         except OSError as E:
             R[node]['err']['output']  = E.strerror
-            R[node]['err']['message'] = E.message
+            R[node]['err']['message'] = str(E)
             R[node]['err']['code']    = E.errno
         if R[node]['err']=={}: R[node].pop('err')
 
@@ -191,11 +191,11 @@ def flush_cache(cx,node):
         R[node]['out'] = R[node]['out'].decode('unicode_escape').encode('ascii','ignore')
     except subprocess.CalledProcessError as E:
         R[node]['err']['output']  = E.output
-        R[node]['err']['message'] = E.message
+        R[node]['err']['message'] = str(E)
         R[node]['err']['code']    = E.returncode
     except OSError as E:
         R[node]['err']['output']  = E.strerror
-        R[node]['err']['message'] = E.message
+        R[node]['err']['message'] = str(E)
         R[node]['err']['code']    = E.errno
     if R[node]['err'] == {}: R[node].pop('err')
     return {'flush':R}
@@ -209,7 +209,7 @@ def inject_values(cmd,values,delim='?'):
                 x = execute.find(delim) #replace one at a time
                 if x>0: execute = execute[:x]+v+execute[x+1:]
         else:
-            x = excute.find(delim)  #replace one at a time
+            x = execute.find(delim)  #replace one at a time
             if x>0: execute = execute[:x]+values+execute[x+1:]
     return execute
 
@@ -316,11 +316,11 @@ if nodes is None:
                                            shell=True)
     except subprocess.CalledProcessError as E:
         H['err']['output']   = E.output
-        H['err']['message']  = E.message
+        H['err']['message']  = str(E)
         H['err']['code']     = E.returncode
     except OSError as E:
         H['err']['output']   = E.strerror
-        H['err']['message']  = E.message
+        H['err']['message']  = str(E)
         H['err']['code']     = E.errno
     nodes = []
     for line in H['out'].split('\n'):
@@ -358,8 +358,8 @@ print('for %s number of compute jobs'%jobs)
 
 #global data structures for synchronization patterns------
 result_list = [] #async queue to put results for || stages
-tasks       = Queue.Queue(maxsize=jobs)
-results     = Queue.Queue(maxsize=jobs)
+tasks       = queue.Queue(maxsize=jobs)
+results     = queue.Queue(maxsize=jobs)
 def collect_results(result):
     result_list.append(result)
 #global data structures for synchronization patterns------
